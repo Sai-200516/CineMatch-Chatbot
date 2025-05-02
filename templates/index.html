@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMatch - AI Movie Trailer Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(to bottom, #e6f0fa, #d4e4f7);
+            color: #333;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-container {
+            max-width: 700px;
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+            transition: transform 0.3s ease;
+        }
+        .chat-container:hover {
+            transform: translateY(-5px);
+        }
+        .chat-box {
+            height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 12px 18px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background: #007bff;
+            color: #fff;
+            margin-left: auto;
+            text-align: right;
+        }
+        .bot-message {
+            background: #e9ecef;
+            color: #333;
+            margin-right: auto;
+        }
+        .video-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .recommendation-card {
+            background: #f1f4f8;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .btn-custom {
+            margin: 5px;
+            transition: background-color 0.3s ease;
+        }
+        .btn-custom:hover {
+            opacity: 0.9;
+        }
+        .star-rating button {
+            font-size: 1.2em;
+            padding: 5px 10px;
+            margin: 0 2px;
+        }
+        .input-group input {
+            border-radius: 10px 0 0 10px;
+        }
+        .input-group button {
+            border-radius: 0 10px 10px 0;
+        }
+        .genre-language-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        h2 {
+            color: #005f99;
+            font-weight: 600;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #007bff;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h2 class="text-center mb-4">🎬 CineMatch</h2>
+        <div class="chat-box" id="chat-box">
+            <div class="message bot-message">Welcome to CineMatch! What's your name? Let's find your perfect movie trailer!</div>
+        </div>
+        <div class="buttons text-center mb-3 genre-language-buttons" id="genre-buttons">
+            {% for genre in genres %}
+                <button class="btn btn-outline-primary btn-sm btn-custom" onclick="addGenre('{{ genre }}')">{{ genre|title }}</button>
+            {% endfor %}
+        </div>
+        <div class="buttons text-center mb-3 genre-language-buttons" id="language-buttons">
+            {% for language in languages %}
+                <button class="btn btn-outline-primary btn-sm btn-custom" onclick="addLanguage('{{ language }}')">{{ language|title }}</button>
+            {% endfor %}
+        </div>
+        <div class="buttons text-center mb-3" id="mood-buttons" style="display: none;">
+            <button class="btn btn-primary btn-sm btn-custom" onclick="sendMessage('adventurous')">Adventurous</button>
+            <button class="btn btn-primary btn-sm btn-custom" onclick="sendMessage('relaxed')">Relaxed</button>
+            <button class="btn btn-primary btn-sm btn-custom" onclick="sendMessage('intense')">Intense</button>
+        </div>
+        <form id="chat-form">
+            <div class="input-group mb-3">
+                <input type="text" id="user-input" name="msg" class="form-control" placeholder="Type your name, genres, languages, actors, mood, or search (e.g., 'Telugu thriller Prabhas')..." required>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </div>
+        </form>
+        <div class="buttons text-center mb-3">
+            <button class="btn btn-outline-secondary btn-custom" onclick="sendMessage('start over')">Start Over</button>
+        </div>
+        <div class="video-container" id="video-container"></div>
+        <div class="recommendation-card" id="recommendation-card" style="display: none;"></div>
+        <div class="buttons text-center mt-3 star-rating" id="feedback-buttons" style="display: none;">
+            <p>Rate this recommendation:</p>
+            <button class="btn btn-warning btn-custom" onclick="sendFeedback('rate:1')">★</button>
+            <button class="btn btn-warning btn-custom" onclick="sendFeedback('rate:2')">★★</button>
+            <button class="btn btn-warning btn-custom" onclick="sendFeedback('rate:3')">★★★</button>
+            <button class="btn btn-warning btn-custom" onclick="sendFeedback('rate:4')">★★★★</button>
+            <button class="btn btn-warning btn-custom" onclick="sendFeedback('rate:5')">★★★★★</button>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $("#chat-form").submit(function(e) {
+                e.preventDefault();
+                let userInput = $("#user-input").val();
+                appendMessage("user", userInput);
+                sendMessage(userInput);
+            });
+        });
+
+        function sendMessage(message) {
+            $.ajax({
+                url: "/get_recommendation",
+                type: "POST",
+                data: { msg: message },
+                success: function(data) {
+                    appendMessage("bot", data.reply);
+                    if (data.recommendation) {
+                        displayRecommendation(data.recommendation);
+                        $("#video-container").html(
+                            `<iframe width="100%" height="315" src="${data.recommendation.trailer_url}" frameborder="0" allowfullscreen></iframe>`
+                        );
+                    } else {
+                        $("#video-container").empty();
+                        $("#recommendation-card").hide();
+                    }
+                    $("#feedback-buttons").css("display", data.feedback ? "block" : "none");
+                    $("#mood-buttons").css("display", data.show_mood_buttons ? "block" : "none");
+                    $("#user-input").val("");
+                },
+                error: function() {
+                    appendMessage("bot", "😓 Something went wrong. Try again or type 'start over'!");
+                }
+            });
+        }
+
+        function displayRecommendation(rec) {
+            $("#recommendation-card").html(`
+                <h5>${rec.title}</h5>
+                <p><strong>Genres:</strong> ${rec.genres.join(", ")}</p>
+                <p><strong>Language:</strong> ${rec.language}</p>
+                <p><strong>Actors:</strong> ${rec.actors.join(", ")}</p>
+                <p>${rec.description}</p>
+            `).show();
+        }
+
+        function sendFeedback(feedback) {
+            appendMessage("user", feedback.replace("rate:", "") + " stars");
+            sendMessage(feedback);
+        }
+
+        function appendMessage(sender, text) {
+            let messageClass = sender === "user" ? "user-message" : "bot-message";
+            $("#chat-box").append(`<div class="message ${messageClass}">${text}</div>`);
+            $("#chat-box").scrollTop($("#chat-box")[0].scrollHeight);
+        }
+
+        function addGenre(genre) {
+            let current = $("#user-input").val();
+            $("#user-input").val(current ? current + ", " + genre : genre);
+        }
+
+        function addLanguage(language) {
+            let current = $("#user-input").val();
+            $("#user-input").val(current ? current + ", " + language : language);
+        }
+    </script>
+</body>
+</html>
